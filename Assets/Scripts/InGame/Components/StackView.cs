@@ -11,9 +11,11 @@ namespace InGame.Components
         public struct Config
         {
             public int Columns;
+            public int Rows;        // 0이면 무한 — 기존 동작 유지
             public float StackHeight;
             public float HeightOffset;
             public float ColumnOffset;
+            public float RowOffset;
             public float WobbleDuration;
             public float WobbleFrequency;
             public float WobbleAmplitude;
@@ -27,6 +29,9 @@ namespace InGame.Components
 
         private Config _config;
         private readonly List<StackItem> _stackedItems = new();
+        private int _pendingCount;
+
+        public int Count => _stackedItems.Count;
 
         public void Init(Config config)
         {
@@ -36,6 +41,7 @@ namespace InGame.Components
 
         public void AddItem(GameObject item)
         {
+            if (_pendingCount > 0) _pendingCount--;
             item.transform.SetParent(transform);
             item.transform.localPosition = GetStackPosition(_stackedItems.Count);
             item.transform.localRotation = Quaternion.identity;
@@ -52,14 +58,31 @@ namespace InGame.Components
             RemoveItemAsync(item).Forget();
         }
 
+        // 스택에서 아이템을 꺼내 반환 (Destroy 하지 않음)
+        public GameObject TakeItem()
+        {
+            if (_stackedItems.Count == 0) return null;
+            var item = _stackedItems[^1].GameObject;
+            _stackedItems.RemoveAt(_stackedItems.Count - 1);
+            item.transform.SetParent(null);
+            return item;
+        }
+
         private async UniTaskVoid RemoveItemAsync(GameObject item)
         {
             await TweenUtility.ShrinkScaleAsync(item.transform, this.GetCancellationTokenOnDestroy());
             if (item != null) Destroy(item);
         }
 
+        public Vector3 ReserveNextWorldPosition()
+        {
+            var pos = transform.TransformPoint(GetStackPosition(_stackedItems.Count + _pendingCount));
+            _pendingCount++;
+            return pos;
+        }
+
         public Vector3 GetNextWorldPosition() =>
-            transform.TransformPoint(GetStackPosition(_stackedItems.Count));
+            transform.TransformPoint(GetStackPosition(_stackedItems.Count + _pendingCount));
 
         public void OnUpdate()
         {
@@ -82,13 +105,30 @@ namespace InGame.Components
 
         private Vector3 GetStackPosition(int index)
         {
-            if (_config.Columns <= 1)
-                return new Vector3(0f, _config.HeightOffset + _config.StackHeight * index, 0f);
+            var cols = Mathf.Max(1, _config.Columns);
 
-            var column = index % _config.Columns;
-            var row = index / _config.Columns;
-            var x = column == 0 ? -_config.ColumnOffset : _config.ColumnOffset;
-            return new Vector3(x, _config.HeightOffset + _config.StackHeight * row, 0f);
+            // Rows <= 0: 기존 동작 (열 채우고 Y축으로 계속 올라감)
+            if (_config.Rows <= 0)
+            {
+                var col = index % cols;
+                var row = index / cols;
+                var x = cols == 1 ? 0f : col == 0 ? -_config.ColumnOffset : _config.ColumnOffset;
+                return new Vector3(x, _config.HeightOffset + _config.StackHeight * row, 0f);
+            }
+
+            // Rows > 0: Columns×Rows 격자를 한 층으로, 채우면 Y로 올라감
+            var rows = _config.Rows;
+            var itemsPerLayer = cols * rows;
+            var layer = index / itemsPerLayer;
+            var indexInLayer = index % itemsPerLayer;
+            var c = indexInLayer % cols;
+            var r = indexInLayer / cols;
+
+            var xGrid = cols == 1 ? 0f : c == 0 ? -_config.ColumnOffset : _config.ColumnOffset;
+            var zGrid = rows == 1 ? 0f : (r - (rows - 1) * 0.5f) * _config.RowOffset;
+            var yGrid = _config.HeightOffset + _config.StackHeight * layer;
+
+            return new Vector3(xGrid, yGrid, zGrid);
         }
 
         private void OnDestroy()

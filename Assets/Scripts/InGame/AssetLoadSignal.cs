@@ -53,6 +53,10 @@ namespace InGame
             if (handcuffStack == null) Debug.LogWarning("handcuff_stack is empty");
             else assetModel.AddView("handcuff_stack", handcuffStack);
 
+            var moneyStack = await assetManager.LoadAssetAsync<GameObject>(LoadTarget.View, "money_stack");
+            if (moneyStack == null) Debug.LogWarning("money_stack is empty");
+            else assetModel.AddView("money_stack", moneyStack);
+
             var equipmentRecords = Global.Instance.TableManager.MiningEquipmentsRecord.GetAllRecord();
             foreach (var record in equipmentRecords)
             {

@@ -60,6 +60,24 @@ namespace Common
         public const float HandCuffSellWobbleAmplitude = 8f;
         #endregion
 
+        #region MoneyCarryView
+        public const float MoneyCarryBackOffset = 0.4f;
+        public const float MoneyCarryStackHeight = 0.15f;
+        public const float MoneyCarryHeightOffset = 1f;
+        #endregion
+
+        #region MoneyStackZone
+        public const int MoneyStackColumns = 2;
+        public const int MoneyStackRows = 3;
+        public const float MoneyStackHeight = 0.05f;
+        public const float MoneyStackHeightOffset = 0.1f;
+        public const float MoneyStackColumnOffset = 0.15f;
+        public const float MoneyStackRowOffset = 0.15f;
+        public const float MoneyStackWobbleDuration = 0.5f;
+        public const float MoneyStackWobbleFrequency = 3f;
+        public const float MoneyStackWobbleAmplitude = 8f;
+        #endregion
+
         #region JoystickInputArea
         public const float JoystickStandbyTime = 4f;
         #endregion

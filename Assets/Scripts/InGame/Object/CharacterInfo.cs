@@ -9,6 +9,7 @@ namespace InGame.Object
         public ReactiveProperty<int> MiningItemCount { get; } = new(0);
         public ReactiveProperty<int> MaxMiningItemCount { get; } = new(0);
         public ReactiveProperty<int> HandCuffCount { get; } = new(0);
+        public ReactiveProperty<int> MoneyCarryCount { get; } = new(0);
         public ReactiveProperty<int> Money { get; } = new(0);
         public CharacterStatusData Status { get; set; }
     }

@@ -78,6 +78,9 @@ namespace InGame.Object
             var handCuffCarryView = gameObject.AddComponent<HandCuffCarryView>();
             handCuffCarryView.Init(Hub, InGameModel);
 
+            var moneyCarryView = gameObject.AddComponent<MoneyCarryView>();
+            moneyCarryView.Init(Hub, InGameModel);
+
             Hub.Controller = Hub.IsPlayer
                 ? gameObject.AddComponent<ControllerPlayer>()
                 : gameObject.AddComponent<ControllerAI>();
