@@ -1,0 +1,12 @@
+{
+    "tables": [
+        {
+            "fileName": "CharacterStatus",
+            "hash": "51400a4c0950536c29459feea9516fc3"
+        },
+        {
+            "fileName": "MiningEquipments",
+            "hash": "20bbefe4ba410df8ce50aa5cbc91f269"
+        }
+    ]
+}
