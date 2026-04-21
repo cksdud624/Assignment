@@ -1,5 +1,6 @@
 using Common;
 using Common.Template.Interface;
+using InGame.Model;
 using UniRx;
 using UniRx.Triggers;
 using UnityEngine;
@@ -15,8 +16,21 @@ namespace InGame.UI
         [SerializeField] private CanvasGroup joystickViewGroup;
         [SerializeField] private JoystickView joystickView;
         [SerializeField] private GameObject inputStandby;
+
+        public JoystickView JoystickView => joystickView;
+
         private float _lastInteractTime;
         private bool _isActive;
+        private bool _standbyEnabled = true;
+        private bool _playerInputEnabled = true;
+        private InGameModel _inGameModel;
+
+        public void Init(InGameModel inGameModel)
+        {
+            _inGameModel = inGameModel;
+            inGameModel.OnSetStandbyEnabled += SetStandbyEnabled;
+            inGameModel.OnSetPlayerInputEnabled += SetPlayerInputEnabled;
+        }
 
         private void Start()
         {
@@ -42,10 +56,35 @@ namespace InGame.UI
         private void OnDestroy()
         {
             Global.Instance?.UnBindUpdate(this);
+            if (_inGameModel != null)
+            {
+                _inGameModel.OnSetStandbyEnabled -= SetStandbyEnabled;
+                _inGameModel.OnSetPlayerInputEnabled -= SetPlayerInputEnabled;
+            }
+        }
+
+        private void SetPlayerInputEnabled(bool enabled)
+        {
+            _playerInputEnabled = enabled;
+            backgroundImage.raycastTarget = enabled;
+            if (!enabled)
+            {
+                joystickViewGroup.alpha = 0;
+                _isActive = false;
+                joystickView.Deactivate();
+            }
+        }
+
+        public void SetStandbyEnabled(bool enabled)
+        {
+            _standbyEnabled = enabled;
+            if (!enabled && inputStandby.activeSelf)
+                inputStandby.SetActive(false);
         }
 
         public void OnUpdate()
         {
+            if (!_standbyEnabled) return;
             if (_isActive) return;
             if (inputStandby.activeSelf) return;
             if (Time.time - _lastInteractTime >= JoystickStandbyTime)
@@ -56,6 +95,7 @@ namespace InGame.UI
 
         private void OnPointerDownBackgroundImage(PointerEventData eventData)
         {
+            if (!_playerInputEnabled) return;
             _isActive = true;
             _lastInteractTime = Time.time;
             inputStandby.SetActive(false);
@@ -65,6 +105,7 @@ namespace InGame.UI
 
         private void OnDragBackgroundImage(PointerEventData eventData)
         {
+            if (!_playerInputEnabled) return;
             _lastInteractTime = Time.time;
             joystickView.UpdateHandle(eventData.position, eventData.pressEventCamera);
         }

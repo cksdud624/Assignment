@@ -30,14 +30,21 @@ namespace InGame.Components
 
         public void OnFixedUpdate()
         {
-            Hub.Rigidbody.velocity = _moveDirection * MoveSpeed;
+            var speed = Hub.Info?.Status?.MoveSpeed ?? MoveSpeed;
+            Hub.Rigidbody.velocity = _moveDirection * speed;
 
             if (Hub.IsMoving.Value)
             {
                 var targetRot = Quaternion.LookRotation(_moveDirection);
-                Hub.Model.transform.rotation = Quaternion.Slerp(
-                    Hub.Model.transform.rotation, targetRot, Time.fixedDeltaTime * RotateSpeed);
+                Hub.FacingNode.rotation = Quaternion.Slerp(
+                    Hub.FacingNode.rotation, targetRot, Time.fixedDeltaTime * RotateSpeed);
             }
+        }
+
+        public virtual void Stop()
+        {
+            SetMoveDirection(Vector3.zero);
+            Global.Instance?.UnBindFixedUpdate(this);
         }
 
         protected virtual void OnDestroy()

@@ -13,6 +13,7 @@ namespace InGame.Components
         private PlayerInput _playerInput;
         private InputActionMap _defaultMap;
         private JoystickView _joystick;
+        private bool _inputEnabled = true;
 
         public override void Init(InGameModel inGameModel, CharacterHub hub)
         {
@@ -37,6 +38,7 @@ namespace InGame.Components
 
             BindActions();
             _defaultMap.Enable();
+            inGameModel.OnSetPlayerInputEnabled += SetInputEnabled;
         }
 
         private void BindActions()
@@ -76,6 +78,18 @@ namespace InGame.Components
             }
         }
 
+        private void SetInputEnabled(bool enabled)
+        {
+            _inputEnabled = enabled;
+            if (enabled)
+                _defaultMap.Enable();
+            else
+            {
+                _defaultMap.Disable();
+                SetMoveDirection(Vector3.zero);
+            }
+        }
+
         public void SetJoystick(JoystickView joystick)
         {
             _joystick = joystick;
@@ -83,7 +97,7 @@ namespace InGame.Components
             _joystick.OnCanceled += OnJoystickCanceled;
         }
 
-        private void OnJoystickPerformed(Vector2 v) => SetMoveDirection(ToWorldDirection(v));
+        private void OnJoystickPerformed(Vector2 v) { if (_inputEnabled) SetMoveDirection(ToWorldDirection(v)); }
         private void OnJoystickCanceled() => SetMoveDirection(Vector3.zero);
 
         private static Vector3 ToWorldDirection(Vector2 input)
@@ -94,8 +108,11 @@ namespace InGame.Components
             return forward * input.y + right * input.x;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
+            InGameModel.OnSetPlayerInputEnabled -= SetInputEnabled;
+
             if (_joystick != null)
             {
                 _joystick.OnPerformed -= OnJoystickPerformed;

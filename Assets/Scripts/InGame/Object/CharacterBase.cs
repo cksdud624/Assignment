@@ -20,7 +20,8 @@ namespace InGame.Object
             InGameModel = model;
             AddObject();
             AddParts();
-            Hub.State = ObjectState.Ready;
+            InGameModel.InGameObjectModel.IgnoreCollisionsWithCharacters(Hub.Collider);
+            Hub.State.Value = ObjectState.Ready;
         }
         protected override void AddObject()
         {
@@ -37,13 +38,20 @@ namespace InGame.Object
         protected override void AddParts()
         {
             //추후 다른 데이터가 들어올 수 있으면 밖으로 빼야함
+            var statusId = Hub.IsPlayer ? 1001L : 1002L;
             Hub.Info = new CharacterInfo
             {
-                Status = Global.Instance.TableManager.CharacterStatusRecord.GetRecord(1001)
+                Status = Global.Instance.TableManager.CharacterStatusRecord.GetRecord(statusId)
             };
 
+            var facingNode = new GameObject("FacingNode");
+            facingNode.transform.SetParent(transform);
+            facingNode.transform.localPosition = Vector3.zero;
+            facingNode.transform.localRotation = Quaternion.identity;
+            Hub.FacingNode = facingNode.transform;
+
             var assetModel = InGameModel.InGameAssetModel;
-            var model = Instantiate(assetModel.GetModel("player"), transform);
+            var model = Instantiate(assetModel.GetModel(statusId.ToString()), Hub.FacingNode);
             Hub.Model = model;
             Hub.Rigidbody = gameObject.AddComponent<Rigidbody>();
             Hub.Rigidbody.constraints = RigidbodyConstraints.FreezeRotation;
@@ -70,7 +78,7 @@ namespace InGame.Object
             Hub.Behaviour.Init(Hub, InGameModel);
 
             var miningRange = gameObject.AddComponent<MiningRangeTrigger>();
-            miningRange.Init(Hub);
+            miningRange.Init(Hub, InGameModel);
 
             var stackView = gameObject.AddComponent<MiningItemStackView>();
             stackView.Init(Hub, InGameModel);
@@ -91,6 +99,7 @@ namespace InGame.Object
         public bool IsPlayer => Hub.IsPlayer;
         public ControllerBase Controller => Hub.Controller;
         public CharacterInfo Info => Hub.Info;
+        public Collider Collider => Hub.Collider;
         public void SetCharacterState(CharacterState state) => Hub.CharacterState.Value = state;
 
         private new CharacterHub Hub

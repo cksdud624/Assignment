@@ -17,7 +17,6 @@ namespace InGame.Components
         private Transform _followTarget;
         private float _followStopDistance;
         private bool _followWasMoving;
-        private Action _onFollowSettled;
 
         public override void Init(InGameModel inGameModel, CharacterHub hub)
         {
@@ -34,14 +33,13 @@ namespace InGame.Components
 
         // 앞 캐릭터를 동적으로 추적 — stopDistance 이내면 정지, 멀어지면 재개
         // onFirstSettled: 처음 정착했을 때 한 번 호출
-        public void FollowTransform(Transform target, float stopDistance, Action onFirstSettled = null)
+        public void FollowTransform(Transform target, float stopDistance)
         {
             _targetPosition = null;
             _onArrived = null;
             _followTarget = target;
             _followStopDistance = stopDistance;
             _followWasMoving = true;
-            _onFollowSettled = onFirstSettled;
         }
 
         public void StopMove()
@@ -49,7 +47,6 @@ namespace InGame.Components
             _targetPosition = null;
             _followTarget = null;
             _onArrived = null;
-            _onFollowSettled = null;
             SetMoveDirection(Vector3.zero);
         }
 
@@ -65,9 +62,6 @@ namespace InGame.Components
                     if (_followWasMoving)
                     {
                         _followWasMoving = false;
-                        var cb = _onFollowSettled;
-                        _onFollowSettled = null;
-                        cb?.Invoke();
                     }
                 }
                 else
@@ -94,6 +88,15 @@ namespace InGame.Components
             }
 
             SetMoveDirection(toTarget.normalized);
+        }
+
+        public override void Stop()
+        {
+            _targetPosition = null;
+            _followTarget = null;
+            _onArrived = null;
+            Global.Instance?.UnBindUpdate(this);
+            base.Stop();
         }
 
         protected override void OnDestroy()

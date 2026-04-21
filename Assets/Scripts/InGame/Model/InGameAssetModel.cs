@@ -34,5 +34,10 @@ namespace InGame.Model
         public void RemoveAnimationClip(string key) => _animationClips.Remove(key);
         public AnimationClip GetAnimationClip(string key) => _animationClips.GetValueOrDefault(key);
         public Dictionary<string, AnimationClip> GetAnimationClips() => _animationClips;
+        
+        private readonly Dictionary<string, AudioClip> _audioClips = new();
+        public void AddSoundClip(string key, AudioClip clip) => _audioClips.Add(key, clip);
+        public void RemoveSoundClip(string key) => _audioClips.Remove(key);
+        public AudioClip GetAudioClip(string key) => _audioClips.GetValueOrDefault(key);
     }
 }

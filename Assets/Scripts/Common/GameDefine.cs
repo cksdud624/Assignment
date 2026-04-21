@@ -60,9 +60,12 @@ namespace Common
         public const float HandCuffSellWobbleAmplitude = 8f;
         #endregion
 
+        #region Money
+        public const int MoneyStackValue = 5;
+        #endregion
+
         #region MoneyCarryView
-        public const float MoneyCarryBackOffset = 0.4f;
-        public const float MoneyCarryStackHeight = 0.15f;
+        public const float MoneyCarryStackHeight = 0.05f;
         public const float MoneyCarryHeightOffset = 1f;
         #endregion
 
@@ -80,6 +83,12 @@ namespace Common
 
         #region JoystickInputArea
         public const float JoystickStandbyTime = 4f;
+        #endregion
+
+        #region Tutorial
+        public const float TutorialArrowHeightOffset = 2.5f;
+        public const float TutorialArrowBobSpeed = 3f;
+        public const float TutorialArrowBobAmount = 0.25f;
         #endregion
 
         public enum SceneType
@@ -127,5 +136,19 @@ namespace Common
             Idle,
             Mining
         }
+
+        public enum SoundClip
+        {
+            Mining1,
+            Mining2,
+            MiningOre,
+            ItemCharge,
+            MachineActivate,
+            GetMoney,
+            SpendMoney,
+            PurchasedMoney,
+            GameClear,
+        }
+        
     }
 }

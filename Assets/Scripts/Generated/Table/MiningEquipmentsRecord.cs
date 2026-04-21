@@ -50,6 +50,7 @@ namespace Generated.Table
 		public float MiningTime {get; private set;}
 		public float MiningTrigger {get; private set;}
 		public int MaxMiningItemCount {get; private set;}
+		public int RequiredLevelUp {get; private set;}
 
 		public MiningEquipmentsData(BinaryReader reader)
 		{
@@ -86,6 +87,7 @@ namespace Generated.Table
 			MiningTime = float.TryParse(tableDatas[5], out float vFloat5) ? vFloat5 : 0f;
 			MiningTrigger = float.TryParse(tableDatas[6], out float vFloat6) ? vFloat6 : 0f;
 			MaxMiningItemCount = int.TryParse(tableDatas[7], out int vInt7) ? vInt7 : 0;
+			RequiredLevelUp = int.TryParse(tableDatas[8], out int vInt8) ? vInt8 : 0;
 		}
 	}
 }

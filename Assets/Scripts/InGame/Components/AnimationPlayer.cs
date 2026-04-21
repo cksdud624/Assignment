@@ -33,12 +33,15 @@ namespace InGame.Components
         private int _upperCurrentSlot;
         private CancellationTokenSource _upperFadeCts;
         private CancellationTokenSource _layerFadeCts;
+        
+        private bool _isLowerBodyLocked = false;
 
         public void Init<TAnimation>(GameObject model, Dictionary<TAnimation, AnimationClip> clips) where TAnimation : Enum
         {
             _graph = PlayableGraph.Create("AnimationGraph");
             var modelAnimator = model.GetComponent<Animator>();
             _animator = modelAnimator == null ? model.AddComponent<Animator>() : modelAnimator;
+            _animator.applyRootMotion = false;
 
             foreach (var clip in clips)
                 _animationClips.Add(Convert.ToInt32(clip.Key), AnimationClipPlayable.Create(_graph, clip.Value));
@@ -57,10 +60,11 @@ namespace InGame.Components
             _graph.Play();
         }
 
-        public void Init<TAnimation>(GameObject model, Dictionary<TAnimation, AnimationClip> clips, ObjectHub hub) where TAnimation : Enum
+        public void Init<TAnimation>(GameObject model, Dictionary<TAnimation, AnimationClip> clips, CharacterHub hub) where TAnimation : Enum
         {
             Init(model, clips);
             hub.IsMoving.Subscribe(OnIsMovingChanged).AddTo(this);
+            hub.IsLowerBodyLocked.Subscribe(isLocked =>  _isLowerBodyLocked = isLocked);
         }
 
         public Transform GetBoneTransform(HumanBodyBones bone)
@@ -78,20 +82,37 @@ namespace InGame.Components
             return _animator.GetBoneTransform(bone);
         }
 
-        public void PlayAnimation<TAnimation>(TAnimation anim) where TAnimation : Enum
+        public void PlayAnimation<TAnimation>(TAnimation anim, Action onAnimationEnd = null) where TAnimation : Enum
         {
             if (_animationClips.TryGetValue(Convert.ToInt32(anim), out var clip))
-                CrossFade(clip).Forget();
+                CrossFade(clip, onAnimationEnd: onAnimationEnd).Forget();
         }
 
-        public void PlayUpperBodyAnimation<TAnimation>(TAnimation anim, float? desiredDuration = null) where TAnimation : Enum
+        public void PlayAnimationClip(AnimationClip clip)
+        {
+            var playable = AnimationClipPlayable.Create(_graph, clip);
+            CrossFade(playable).Forget();
+        }
+
+        public void PlayUpperBodyAnimation<TAnimation>(TAnimation anim, float? desiredDuration = null, float crossFadeDuration = 0.3f) where TAnimation : Enum
         {
             _layerFadeCts?.Cancel();
             _layerFadeCts?.Dispose();
             _layerFadeCts = null;
             _layerMixer.SetInputWeight(1, 1f);
             if (_animationClips.TryGetValue(Convert.ToInt32(anim), out var clip))
-                CrossFadeUpperBody(clip, desiredDuration: desiredDuration).Forget();
+                CrossFadeUpperBody(clip, crossFadeDuration, desiredDuration: desiredDuration).Forget();
+        }
+
+        public void PlayUpperBodyAnimationClip(AnimationClip clip, float? desiredDuration = null, float crossFadeDuration = 0.3f)
+        {
+            if (clip == null) return;
+            _layerFadeCts?.Cancel();
+            _layerFadeCts?.Dispose();
+            _layerFadeCts = null;
+            _layerMixer.SetInputWeight(1, 1f);
+            var playable = AnimationClipPlayable.Create(_graph, clip);
+            CrossFadeUpperBody(playable, crossFadeDuration, desiredDuration: desiredDuration).Forget();
         }
 
         public void StopUpperBodyAnimation(float duration = 0.3f)
@@ -108,41 +129,24 @@ namespace InGame.Components
             if (!completed) return;
             if (_upperBodyMixer.GetInput(0).IsValid()) _upperBodyMixer.DisconnectInput(0);
             if (_upperBodyMixer.GetInput(1).IsValid()) _upperBodyMixer.DisconnectInput(1);
+            _upperBodyMixer.SetInputWeight(0, 0f);
+            _upperBodyMixer.SetInputWeight(1, 0f);
             _upperCurrentClip = default;
         }
 
         private void OnIsMovingChanged(bool isMoving)
         {
-            var key = isMoving ? Convert.ToInt32(InGameCommonAnimation.Walk) : Convert.ToInt32(InGameCommonAnimation.Idle);
-            if (_animationClips.TryGetValue(key, out var clip))
-                CrossFade(clip).Forget();
+            if (!_isLowerBodyLocked)
+            {
+                var key = isMoving
+                    ? Convert.ToInt32(InGameCommonAnimation.Walk)
+                    : Convert.ToInt32(InGameCommonAnimation.Idle);
+                if (_animationClips.TryGetValue(key, out var clip))
+                    CrossFade(clip).Forget();
+            }
         }
 
-        public void PlayImmediate<TAnimation>(TAnimation anim) where TAnimation : Enum
-        {
-            if (!_animationClips.TryGetValue(Convert.ToInt32(anim), out var clip)) return;
-            if (_targetClip.IsValid() && _targetClip.GetHandle() == clip.GetHandle()) return;
-
-            _fadeCts?.Cancel();
-            _fadeCts?.Dispose();
-            _fadeCts = null;
-
-            if (_fullBodyMixer.GetInput(1 - _currentSlot).IsValid())
-                _fullBodyMixer.DisconnectInput(1 - _currentSlot);
-
-            clip.SetTime(0);
-            clip.SetDone(false);
-            clip.Play();
-
-            _fullBodyMixer.ConnectInput(_currentSlot, clip, 0);
-            _fullBodyMixer.SetInputWeight(_currentSlot, 1f);
-            _fullBodyMixer.SetInputWeight(1 - _currentSlot, 0f);
-
-            _currentClip = clip;
-            _targetClip  = clip;
-        }
-
-        private async UniTask CrossFade(AnimationClipPlayable nextClip, float duration = 0.3f)
+        private async UniTask CrossFade(AnimationClipPlayable nextClip, float duration = 0.3f, Action onAnimationEnd = null)
         {
             if (_targetClip.IsValid() && _targetClip.GetHandle() == nextClip.GetHandle()) return;
 
@@ -202,6 +206,8 @@ namespace InGame.Components
 
             _currentClip = nextClip;
             _currentSlot = nextSlot;
+            
+            onAnimationEnd?.Invoke();
         }
 
         private async UniTask CrossFadeUpperBody(AnimationClipPlayable nextClip, float duration = 0.3f, float? desiredDuration = null)
@@ -219,8 +225,12 @@ namespace InGame.Components
 
             if (_upperCurrentClip.IsValid() && _upperCurrentClip.GetHandle() == nextClip.GetHandle())
             {
-                _upperBodyMixer.DisconnectInput(_upperCurrentSlot);
-                _upperCurrentClip = default;
+                nextClip.SetSpeed(desiredDuration.HasValue ? nextClip.GetAnimationClip().length / desiredDuration.Value : 1.0);
+                nextClip.SetTime(0);
+                nextClip.SetDone(false);
+                nextClip.Play();
+                _upperBodyMixer.SetInputWeight(_upperCurrentSlot, 1f);
+                return;
             }
 
             nextClip.SetSpeed(desiredDuration.HasValue ? nextClip.GetAnimationClip().length / desiredDuration.Value : 1.0);

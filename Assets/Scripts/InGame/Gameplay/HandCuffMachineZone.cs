@@ -18,12 +18,15 @@ namespace InGame.Gameplay
         [SerializeField] private HandCuffOutputZone handCuffOutputZone;
 
         public ReactiveProperty<int> MiningItemCount { get; } = new(0);
+        public InteractZone InteractZone => interactZone;
+        public HandCuffOutputZone HandCuffOutputZone => handCuffOutputZone;
 
         private InGameModel _inGameModel;
         private SerialDisposable _transferDisposable;
         private SerialDisposable _consumeDisposable;
         private GameObject _itemPrefab;
         private StackView _stackView;
+        private int _pitchCount;
 
         public void Init(InGameModel inGameModel)
         {
@@ -48,8 +51,18 @@ namespace InGame.Gameplay
             interactZone.OnPlayerExited.Subscribe(OnPlayerExited).AddTo(this);
 
             MiningItemCount
-                .Where(count => count >= 1)
-                .Subscribe(OnMiningItemCountChanged)
+                .Select(c => c > 0)
+                .DistinctUntilChanged()
+                .Where(hasItems => hasItems)
+                .Subscribe(_ => StartConsumeLoop())
+                .AddTo(this);
+
+            MiningItemCount
+                .Subscribe(count =>
+                {
+                    var max = interactZone.MaxCount;
+                    interactZone.SetMaxReached(max > 0 && count >= max);
+                })
                 .AddTo(this);
         }
 
@@ -70,11 +83,12 @@ namespace InGame.Gameplay
         private void OnPlayerExited(CharacterBase player)
         {
             _transferDisposable.Disposable = Disposable.Empty;
+            _pitchCount = 0;
         }
 
         #region Events
 
-        private void OnMiningItemCountChanged(int count)
+        private void StartConsumeLoop()
         {
             _consumeDisposable.Disposable = Observable
                 .Interval(TimeSpan.FromSeconds(0.7))
@@ -90,14 +104,51 @@ namespace InGame.Gameplay
             var ct = this.GetCancellationTokenOnDestroy();
             TweenUtility.PopScaleAsync(machine, ct).Forget();
             PopOutputAsync(ct).Forget();
+
+            var clip = _inGameModel.InGameAssetModel.GetAudioClip(nameof(SoundClip.MachineActivate));
+            _inGameModel.SoundPlayer.PlayOnce(clip, machine.position);
         }
 
         #endregion
 
+        private float CalcPitch() => Mathf.Lerp(1f, 1.5f, Mathf.Clamp01(_pitchCount / 9f));
+
+        public void Stop()
+        {
+            _transferDisposable.Disposable = Disposable.Empty;
+            _consumeDisposable.Disposable = Disposable.Empty;
+        }
+
+        public void ReceiveAIItem(Vector3 from)
+        {
+            ReceiveAIItemAsync(from).Forget();
+        }
+
+        private async UniTaskVoid ReceiveAIItemAsync(Vector3 from)
+        {
+            if (_itemPrefab == null) return;
+            var max = interactZone.MaxCount;
+            if (max > 0 && MiningItemCount.Value >= max) return;
+            var worldDest = _stackView.GetNextWorldPosition();
+            var item = Instantiate(_itemPrefab);
+            item.transform.position = from;
+            var ct = this.GetCancellationTokenOnDestroy();
+            await TweenUtility.MoveArcAsync(item.transform, from, worldDest, ct);
+            if (item == null) return;
+            _stackView.AddItem(item);
+            MiningItemCount.Value++;
+        }
+
         private void TransferItem(CharacterBase player)
         {
+            var max = interactZone.MaxCount;
+            if (max > 0 && MiningItemCount.Value >= max) return;
+
             player.Info.MiningItemCount.Value--;
             MiningItemCount.Value++;
+            var clip = _inGameModel.InGameAssetModel.GetAudioClip(nameof(SoundClip.ItemCharge));
+            _inGameModel.SoundPlayer.PlayOnce(clip, interactZone.transform.position, CalcPitch());
+            _pitchCount = Mathf.Min(_pitchCount + 1, 10);
 
             var from = player.transform.position + Vector3.up * HandCuffPlayerItemOffset;
             var worldDest = _stackView.GetNextWorldPosition();

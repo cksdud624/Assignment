@@ -22,17 +22,12 @@ namespace InGame.Gameplay
         private readonly List<ObjectBase> _spawnedObjects = new();
         private BoxCollider _collider;
         private float _scaledY;
-
-        private readonly Subject<ObjectBase> _onClosestObjectFound = new();
-        public IObservable<ObjectBase> OnClosestObjectFound => _onClosestObjectFound;
-
-        private CharacterBase _player;
         private InGameModel _inGameModel;
+        private SerialDisposable _oreRespawnDisposable;
 
         public void Init(InGameModel inGameModel)
         {
             _inGameModel = inGameModel;
-            _inGameModel.OnPlayerChanged += OnSetPlayer;
 
             _collider = gameObject.GetComponent<BoxCollider>();
             if (_collider == null)
@@ -78,26 +73,41 @@ namespace InGame.Gameplay
             }
         }
 
-        #region Events
+        public ObjectBase GetClosestPlayingOre(Vector3 position)
+        {
+            ObjectBase closest = null;
+            var minDist = float.MaxValue;
+            foreach (var obj in _spawnedObjects)
+            {
+                if (obj == null || obj.State.Value != ObjectState.Playing) continue;
+                var dist = (obj.transform.position - position).sqrMagnitude;
+                if (dist >= minDist) continue;
+                minDist = dist;
+                closest = obj;
+            }
+            return closest;
+        }
 
-        private void OnSetPlayer(CharacterBase player) => _player = player;
+        #region Events
 
         private void OnTriggerEntered(Collider col)
         {
-            if (_player == null || col != _player.Collider) return;
-            _player.SetCharacterState(CharacterState.Mining);
+            var characterBase = col.GetComponentInParent<CharacterBase>();
+            if (characterBase == null) return;
+            characterBase.SetCharacterState(CharacterState.Mining);
         }
 
         private void OnTriggerExited(Collider col)
         {
-            if (_player == null || col != _player.Collider) return;
-            _player.SetCharacterState(CharacterState.Idle);
+            var characterBase = col.GetComponentInParent<CharacterBase>();
+            if (characterBase == null) return;
+            characterBase.SetCharacterState(CharacterState.Idle);
+                
         }
 
         private void OnDestroy()
         {
-            if (_inGameModel != null)
-                _inGameModel.OnPlayerChanged -= OnSetPlayer;
+            _oreRespawnDisposable?.Dispose();
         }
 
         #endregion

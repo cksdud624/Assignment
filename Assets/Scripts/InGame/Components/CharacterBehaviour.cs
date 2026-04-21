@@ -49,8 +49,6 @@ namespace InGame.Components
                     ClearEquipments();
                     break;
                 case CharacterState.Mining:
-                    var record = Global.Instance.TableManager.MiningEquipmentsRecord.GetRecordByLevel(_hub.Info.MiningLevel.Value);
-                    _hub.AnimationPlayer.PlayUpperBodyAnimation(InGameCommonAnimation.Mining, record?.MiningTime);
                     ApplyMiningEquipment();
                     break;
             }
@@ -80,8 +78,7 @@ namespace InGame.Components
                     AttachToHand(prefab, HumanBodyBones.RightHand);
                     break;
                 case 2:
-                    AttachToHand(prefab, HumanBodyBones.RightHand);
-                    AttachToHand(prefab, HumanBodyBones.LeftHand);
+                    AttachToFront(prefab);
                     break;
                 case 3:
                     BoardVehicle(prefab);
@@ -99,20 +96,36 @@ namespace InGame.Components
             _attachedEquipments.Add(obj);
         }
 
-        private void BoardVehicle(GameObject prefab)
+        private void AttachToFront(GameObject prefab, float forwardOffset = 0.5f)
         {
-            var vehicle = Instantiate(prefab, transform);
-            vehicle.transform.localPosition = Vector3.zero;
-            vehicle.transform.localRotation = Quaternion.identity;
-            _hub.Model.transform.SetParent(vehicle.transform);
-            _hub.Model.transform.localPosition = Vector3.zero;
-            _hub.Model.transform.localRotation = Quaternion.identity;
-            _attachedEquipments.Add(vehicle);
-            _isBoarding = true;
+            var pivot = new GameObject("FrontAttachmentPivot");
+            pivot.transform.SetParent(_hub.FacingNode);
+            pivot.transform.localPosition = new Vector3(0f, 0f, forwardOffset);
+            pivot.transform.localRotation = Quaternion.identity;
+
+            var instance = Instantiate(prefab, pivot.transform);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            _attachedEquipments.Add(pivot);
+        }
+
+        private void BoardVehicle(GameObject prefab, float forwardOffset = 0.5f)
+        {
+            var pivot = new GameObject("FrontAttachmentPivot");
+            pivot.transform.SetParent(_hub.FacingNode);
+            pivot.transform.localPosition = new Vector3(0f, 0f, forwardOffset);
+            pivot.transform.localRotation = Quaternion.identity;
+
+            var instance = Instantiate(prefab, pivot.transform);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            _attachedEquipments.Add(pivot);
         }
 
         private void ClearEquipments()
         {
+            _hub.Model.GetComponent<IKHandTarget>()?.Clear();
+
             if (_isBoarding)
             {
                 _hub.Model.transform.SetParent(_modelOriginalParent);

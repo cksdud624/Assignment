@@ -53,7 +53,8 @@ namespace Common
             ObjectModel,
             AnimationClip,
             MiningEquipment,
-            View
+            View,
+            Sound
         }
 
         private const string Model = "Assets/AddressableAssets/Prefab/Model/";
@@ -61,6 +62,7 @@ namespace Common
         private const string AnimationClip = "Assets/AddressableAssets/AnimationClip/";
         private const string MiningEquipment = "Assets/AddressableAssets/Prefab/MiningEquipment/";
         private const string View = "Assets/AddressableAssets/Prefab/View/";
+        private const string Sound = "Assets/AddressableAssets/Sound/";
 
         public static string GetAddressableKey(LoadTarget target, string assetName)
         {
@@ -81,6 +83,9 @@ namespace Common
                     break;
                 case LoadTarget.View:
                     key = View + assetName + ".prefab";
+                    break;
+                case LoadTarget.Sound:
+                    key = Sound + assetName + ".wav";
                     break;
                 default:
                     key = string.Empty;

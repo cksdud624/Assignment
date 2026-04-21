@@ -23,8 +23,14 @@ namespace InGame
             var assetManager = Global.Instance.AssetManager;
             var assetModel = _inGameModel.InGameAssetModel;
 
-            var playerModel = await assetManager.LoadAssetAsync<GameObject>(LoadTarget.Model, "player");
-            assetModel.AddModel("player", playerModel);
+            var characterRecords = Global.Instance.TableManager.CharacterStatusRecord.GetAllRecord();
+            foreach (var record in characterRecords)
+            {
+                var key = record.Id.ToString();
+                var characterModel = await assetManager.LoadAssetAsync<GameObject>(LoadTarget.Model, key);
+                if (characterModel == null) { Debug.LogWarning($"Character model {key} is empty"); continue; }
+                assetModel.AddModel(key, characterModel);
+            }
 
             var oreModel = await assetManager.LoadAssetAsync<GameObject>(LoadTarget.ObjectModel, "ore");
             assetModel.AddObjectModel("ore", oreModel);
@@ -43,6 +49,14 @@ namespace InGame
                 var clip = await assetManager.LoadAssetAsync<AnimationClip>(LoadTarget.AnimationClip, key);
                 if (clip == null) { Debug.LogWarning($"{key} is empty"); continue; }
                 assetModel.AddAnimationClip(key, clip);
+            }
+
+            foreach (SoundClip type in Enum.GetValues(typeof(SoundClip)))
+            {
+                var key = $"{type}";
+                var clip = await assetManager.LoadAssetAsync<AudioClip>(LoadTarget.Sound, key);
+                if (clip == null) { Debug.LogWarning($"{key} is empty"); continue; }
+                assetModel.AddSoundClip(key, clip);
             }
 
             var oreStack = await assetManager.LoadAssetAsync<GameObject>(LoadTarget.View, "ore_stack");
@@ -64,6 +78,11 @@ namespace InGame
                 var equipment = await assetManager.LoadAssetAsync<GameObject>(LoadTarget.MiningEquipment, key);
                 if (equipment == null) { Debug.LogWarning($"MiningEquipment {key} is empty"); continue; }
                 assetModel.AddMiningEquipment(key, equipment);
+                
+                var miningKey = $"{record.Level}_mining";
+                var miningLevelClip = await assetManager.LoadAssetAsync<AnimationClip>(LoadTarget.AnimationClip, miningKey);
+                if (miningLevelClip == null) { Debug.LogWarning($"{miningKey} is empty"); continue; }
+                assetModel.AddAnimationClip(miningKey, miningLevelClip);
             }
 
             _inGameModel.InvokeOnInitialized();

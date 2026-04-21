@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Common.Scene.Parameter;
 using Generated.Table;
 using InGame.Object;
+using UnityEngine;
 using static Common.GameDefine;
 
 namespace InGame.Model
@@ -24,7 +25,7 @@ namespace InGame.Model
         public void ActivateAll()
         {
             foreach (var obj in _objects)
-                if (obj.State == ObjectState.Ready)
+                if (obj.State.Value == ObjectState.Ready)
                     obj.SetState(ObjectState.Playing);
         }
 
@@ -33,6 +34,14 @@ namespace InGame.Model
             _objects.Add(character);
             _characters.Add(character);
             if (isPlayer) Player = character;
+        }
+
+        public void IgnoreCollisionsWithCharacters(Collider collider)
+        {
+            if (collider == null) return;
+            foreach (var character in _characters)
+                if (character.Collider != null && character.Collider != collider)
+                    Physics.IgnoreCollision(collider, character.Collider, true);
         }
 
         public void RemoveCharacter(CharacterBase character, bool isPlayer = false)

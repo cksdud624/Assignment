@@ -7,7 +7,7 @@ namespace InGame.Object
 {
     public class ObjectHub
     {
-        public ObjectState State { get; set; }
+        public ReactiveProperty<ObjectState> State { get; } = new(ObjectState.None);
         public ObjectType Type { get; set; }
         public bool IsPlayer { get; set; }
         public GameObject Model { get; set; }

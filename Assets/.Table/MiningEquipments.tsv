@@ -1,5 +1,5 @@
-Id	Name	Level	Center	Range	MiningTime	MiningTrigger	MaxMiningItemCount
-long	string	int	Vector3	Vector3	float	float	int
-1001	Pick	1	0;1;0	1;1;1	0.5	0.4	10
-1002	Drill	2	0;0;0	0;0;0	0	0	10
-1003	DrillCar	3	0;0;0	0;0;0	0	0	10
+Id	Name	Level	Center	Range	MiningTime	MiningTrigger	MaxMiningItemCount	RequiredLevelUp
+long	string	int	Vector3	Vector3	float	float	int	int
+1001	Pick	1	0;1;0	1;1;1	0.5	0.4	10	20
+1002	Drill	2	0;1;0	1;1;1	0.1	0.5	20	50
+1003	DrillCar	3	0;1;0	1;1;1	0.1	0.5	40	-1

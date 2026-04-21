@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using Common;
 using Common.Template.Interface;
 using Cysharp.Threading.Tasks;
+using InGame.Gameplay;
 using InGame.Model;
 using InGame.Object;
 using UniRx;
@@ -15,10 +18,15 @@ namespace InGame.Components
         private CharacterHub _hub;
         private GameObject _itemPrefab;
         private Transform _oreStacksRoot;
+        private Transform _maxLabelAnchor;
+
         private readonly List<GameObject> _stackedItems = new();
         private float _moveFactor;
         private float _wobbleElapsed = float.MaxValue;
         private bool _wasMoving;
+
+        private MaxLabelController _maxLabelController;
+        private CancellationTokenSource _maxLoopCts;
 
         public void Init(CharacterHub hub, InGameModel inGameModel)
         {
@@ -31,11 +39,50 @@ namespace InGame.Components
             oreStacksObject.transform.localRotation = Quaternion.identity;
             _oreStacksRoot = oreStacksObject.transform;
 
+            var anchorObject = new GameObject("MaxLabelAnchor");
+            anchorObject.transform.SetParent(_oreStacksRoot);
+            anchorObject.transform.localPosition = new Vector3(0f, 0f, -MiningBackOffset);
+            _maxLabelAnchor = anchorObject.transform;
+
             hub.Info.MiningItemCount
                 .Subscribe(OnCountChanged)
                 .AddTo(this);
 
+            if (hub.IsPlayer && inGameModel.MaxLabelController != null)
+            {
+                _maxLabelController = inGameModel.MaxLabelController;
+
+                hub.Info.MiningItemCount
+                    .Select(count => hub.Info.MaxMiningItemCount.Value > 0 && count >= hub.Info.MaxMiningItemCount.Value)
+                    .DistinctUntilChanged()
+                    .Subscribe(isAtMax =>
+                    {
+                        _maxLoopCts?.Cancel();
+                        _maxLoopCts?.Dispose();
+                        _maxLoopCts = null;
+
+                        if (isAtMax)
+                        {
+                            _maxLoopCts = new CancellationTokenSource();
+                            RunMaxLabelLoop(_maxLoopCts.Token).Forget();
+                        }
+                    })
+                    .AddTo(this);
+            }
+
             Global.Instance.BindUpdate(this);
+        }
+
+        private async UniTaskVoid RunMaxLabelLoop(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var max = _hub.Info.MaxMiningItemCount.Value;
+                _maxLabelController.ShowFloatingMax(_maxLabelAnchor, MiningHeightOffset);
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(_maxLabelController.FloatingRiseDuration),
+                    cancellationToken: ct).SuppressCancellationThrow();
+            }
         }
 
         public void OnUpdate()
@@ -109,6 +156,8 @@ namespace InGame.Components
 
         private void OnDestroy()
         {
+            _maxLoopCts?.Cancel();
+            _maxLoopCts?.Dispose();
             Global.Instance?.UnBindUpdate(this);
             foreach (var item in _stackedItems)
                 if (item != null) Destroy(item);

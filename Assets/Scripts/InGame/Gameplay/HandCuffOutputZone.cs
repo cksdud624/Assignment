@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using Common;
 using Cysharp.Threading.Tasks;
 using InGame.Components;
@@ -10,7 +12,7 @@ using static Common.GameDefine;
 
 namespace InGame.Gameplay
 {
-    public class HandCuffOutputZone : MonoBehaviour
+    public class HandCuffOutputZone : MonoBehaviour, IAIPickupSource
     {
         [SerializeField] private InteractZone interactZone;
         [SerializeField] private Transform output;
@@ -18,12 +20,18 @@ namespace InGame.Gameplay
         [SerializeField] private Transform handCuffs;
 
         public ReactiveProperty<int> HandCuffCount { get; } = new(0);
+        public bool HasItems => HandCuffCount.Value > 0;
+        public int ItemCount => HandCuffCount.Value;
+        public bool IsAIInZone(CharacterBase ai) => _aiInZone.Contains(ai);
+        public InteractZone InteractZone => interactZone;
 
         private InGameModel _inGameModel;
         private SerialDisposable _transferDisposable;
         private StackView _stackView;
         private GameObject _itemPrefab;
         private CharacterBase _currentPlayer;
+        private readonly HashSet<CharacterBase> _aiInZone = new();
+        private int _pitchCount;
 
         public void Init(InGameModel inGameModel)
         {
@@ -45,12 +53,22 @@ namespace InGame.Gameplay
             inGameModel.OnInitialized += OnInitialized;
             interactZone.OnPlayerInteracted.Subscribe(OnPlayerInteracted).AddTo(this);
             interactZone.OnPlayerExited.Subscribe(OnPlayerExited).AddTo(this);
+            interactZone.OnAIInteracted.Subscribe(ai => _aiInZone.Add(ai)).AddTo(this);
+            interactZone.OnAIExited.Subscribe(ai => _aiInZone.Remove(ai)).AddTo(this);
 
             HandCuffCount
                 .Select(c => c > 0)
                 .DistinctUntilChanged()
                 .Where(hasItems => hasItems && _currentPlayer != null)
                 .Subscribe(_ => StartTransferInterval(_currentPlayer))
+                .AddTo(this);
+
+            HandCuffCount
+                .Subscribe(count =>
+                {
+                    var max = interactZone.MaxCount;
+                    interactZone.SetMaxReached(max > 0 && count >= max);
+                })
                 .AddTo(this);
         }
 
@@ -72,6 +90,44 @@ namespace InGame.Gameplay
             _stackView.AddItem(item);
         }
 
+        public async UniTask PickupForAI(CharacterBase ai, int threshold, CancellationToken ct)
+        {
+            if (_itemPrefab == null) return;
+
+            await UniTask.WaitUntil(() => _aiInZone.Contains(ai), cancellationToken: ct);
+
+            var pickedUp = 0;
+            while (pickedUp < threshold && !ct.IsCancellationRequested)
+            {
+                if (HandCuffCount.Value <= 0)
+                {
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                    continue;
+                }
+                HandCuffCount.Value--;
+                _stackView.RemoveItem();
+                FlyToAIAsync(ai, ct).Forget();
+                pickedUp++;
+                await UniTask.Delay(TimeSpan.FromSeconds(0.1f), cancellationToken: ct);
+            }
+        }
+
+        private async UniTaskVoid FlyToAIAsync(CharacterBase ai, CancellationToken ct)
+        {
+            var item = Instantiate(_itemPrefab);
+            item.transform.position = output.position;
+            var to = ai.transform.position + Vector3.up * HandCuffPlayerItemOffset;
+            try
+            {
+                await TweenUtility.MoveArcAsync(item.transform, item.transform.position, to, ct);
+            }
+            finally
+            {
+                if (item != null) Destroy(item);
+            }
+            ai.Info.HandCuffCount.Value++;
+        }
+
         #region Events
 
         private void OnPlayerInteracted(CharacterBase player)
@@ -84,6 +140,7 @@ namespace InGame.Gameplay
         {
             _currentPlayer = null;
             _transferDisposable.Disposable = Disposable.Empty;
+            _pitchCount = 0;
         }
 
         #endregion
@@ -101,7 +158,13 @@ namespace InGame.Gameplay
             HandCuffCount.Value--;
             _stackView.RemoveItem();
             FlyToPlayerAsync(player).Forget();
+
+            var clip = _inGameModel.InGameAssetModel.GetAudioClip(nameof(SoundClip.ItemCharge));
+            _inGameModel.SoundPlayer.PlayOnce(clip, interactZone.transform.position, CalcPitch());
+            _pitchCount = Mathf.Min(_pitchCount + 1, 10);
         }
+
+        private float CalcPitch() => Mathf.Lerp(1f, 1.5f, Mathf.Clamp01(_pitchCount / 9f));
 
         private async UniTaskVoid FlyToPlayerAsync(CharacterBase player)
         {

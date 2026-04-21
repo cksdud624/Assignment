@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using InGame.Components;
 using InGame.Model;
+using UniRx;
 using UnityEngine;
 using static Common.GameDefine;
 using ObjectState = Common.GameDefine.ObjectState;
@@ -23,7 +24,7 @@ namespace InGame.Object
             InGameModel = model;
             AddObject();
             AddParts();
-            Hub.State = ObjectState.Ready;
+            Hub.State.Value = ObjectState.Ready;
         }
 
         protected virtual void AddObject()
@@ -57,17 +58,18 @@ namespace InGame.Object
 
             Hub.Collider = model.GetComponent<Collider>();
 
-            var miningTrigger = model.AddComponent<BoxCollider>();
+            var miningTrigger = gameObject.AddComponent<BoxCollider>();
             miningTrigger.isTrigger = true;
             if (Hub.Collider is BoxCollider physicsBox)
             {
-                miningTrigger.center = physicsBox.center;
+                miningTrigger.center = transform.InverseTransformPoint(
+                    model.transform.TransformPoint(physicsBox.center));
                 miningTrigger.size = physicsBox.size;
             }
             else if (Hub.Collider != null)
             {
                 var bounds = Hub.Collider.bounds;
-                miningTrigger.center = model.transform.InverseTransformPoint(bounds.center);
+                miningTrigger.center = transform.InverseTransformPoint(bounds.center);
                 miningTrigger.size = bounds.size;
             }
             Hub.MiningTrigger = miningTrigger;
@@ -76,12 +78,12 @@ namespace InGame.Object
 
         protected ObjectHub Hub { get; set; }
         public ObjectType Type => Hub.Type;
-        public ObjectState State => Hub.State;
-        public void SetState(ObjectState state) => Hub.State = state;
+        public ReactiveProperty<ObjectState> State => Hub.State;
+        public void SetState(ObjectState state) => Hub.State.Value = state;
 
         public void Disappear()
         {
-            Hub.State = ObjectState.Sleep;
+            Hub.State.Value = ObjectState.Sleep;
             Hub.AnimationPlayer.PlayAnimation(InGameObjectAnimation.Disappear);
             RespawnAsync().Forget();
         }
@@ -90,10 +92,10 @@ namespace InGame.Object
         {
             if (Hub.Type != ObjectType.Mining) return;
             await UniTask.Delay(TimeSpan.FromSeconds(4f), cancellationToken: this.GetCancellationTokenOnDestroy());
-            Hub.State = ObjectState.Playing;
-            Hub.AnimationPlayer.PlayAnimation(InGameObjectAnimation.Appear);
+            Hub.AnimationPlayer.PlayAnimation(InGameObjectAnimation.Appear, OnAppearAnimationEnd);
         }
+        private void OnAppearAnimationEnd() => Hub.State.Value = ObjectState.Playing;
+        
         public Collider Collider => Hub.Collider;
-        public Collider MiningTrigger => Hub.MiningTrigger;
     }
 }
