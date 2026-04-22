@@ -27,6 +27,7 @@ namespace InGame.Gameplay
         public IObservable<CharacterBase> OnAIExited => _onAIExited;
 
         private MaxLabel _maxLabel;
+        private int _interactingCount;
 
         private void Awake()
         {
@@ -52,9 +53,10 @@ namespace InGame.Gameplay
         {
             var character = col.GetComponentInParent<CharacterBase>();
             if (character == null) return;
+
             if (character.IsPlayer)
             {
-                ApplyMaterial(interactMaterial);
+                AddInteractor();
                 _onPlayerInteracted.OnNext(character);
             }
             else
@@ -67,15 +69,30 @@ namespace InGame.Gameplay
         {
             var character = col.GetComponentInParent<CharacterBase>();
             if (character == null) return;
+
             if (character.IsPlayer)
             {
-                ApplyMaterial(standbyMaterial);
+                RemoveInteractor();
                 _onPlayerExited.OnNext(character);
             }
             else
             {
                 _onAIExited.OnNext(character);
             }
+        }
+
+        public void AddInteractor()
+        {
+            _interactingCount++;
+            if (_interactingCount == 1)
+                ApplyMaterial(interactMaterial);
+        }
+
+        public void RemoveInteractor()
+        {
+            _interactingCount = Mathf.Max(0, _interactingCount - 1);
+            if (_interactingCount == 0)
+                ApplyMaterial(standbyMaterial);
         }
 
         public void ApplyInteractMaterial() => ApplyMaterial(interactMaterial);

@@ -18,17 +18,22 @@ namespace InGame.Components
         private float _followStopDistance;
         private bool _followWasMoving;
 
+        private Transform _blockingTransform;
+        private float _blockingStopDistance;
+
         public override void Init(InGameModel inGameModel, CharacterHub hub)
         {
             base.Init(inGameModel, hub);
             Global.Instance.BindUpdate(this);
         }
 
-        public void MoveTo(Vector3 target, Action onArrived = null)
+        public void MoveTo(Vector3 target, Action onArrived = null, Transform blocker = null, float blockerStopDistance = 0f)
         {
             _followTarget = null;
             _targetPosition = new Vector3(target.x, transform.position.y, target.z);
             _onArrived = onArrived;
+            _blockingTransform = blocker;
+            _blockingStopDistance = blockerStopDistance;
         }
 
         // 앞 캐릭터를 동적으로 추적 — stopDistance 이내면 정지, 멀어지면 재개
@@ -40,6 +45,7 @@ namespace InGame.Components
             _followTarget = target;
             _followStopDistance = stopDistance;
             _followWasMoving = true;
+            _blockingTransform = null;
         }
 
         public void StopMove()
@@ -47,6 +53,7 @@ namespace InGame.Components
             _targetPosition = null;
             _followTarget = null;
             _onArrived = null;
+            _blockingTransform = null;
             SetMoveDirection(Vector3.zero);
         }
 
@@ -74,6 +81,17 @@ namespace InGame.Components
 
             if (_targetPosition == null) return;
 
+            if (_blockingTransform != null)
+            {
+                var toBlocker = _blockingTransform.position - transform.position;
+                toBlocker.y = 0f;
+                if (toBlocker.sqrMagnitude <= _blockingStopDistance * _blockingStopDistance)
+                {
+                    SetMoveDirection(Vector3.zero);
+                    return;
+                }
+            }
+
             var toTarget = _targetPosition.Value - transform.position;
             toTarget.y = 0f;
 
@@ -81,6 +99,7 @@ namespace InGame.Components
             {
                 SetMoveDirection(Vector3.zero);
                 _targetPosition = null;
+                _blockingTransform = null;
                 var cb = _onArrived;
                 _onArrived = null;
                 cb?.Invoke();
@@ -95,6 +114,7 @@ namespace InGame.Components
             _targetPosition = null;
             _followTarget = null;
             _onArrived = null;
+            _blockingTransform = null;
             Global.Instance?.UnBindUpdate(this);
             base.Stop();
         }

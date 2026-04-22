@@ -173,11 +173,11 @@ namespace InGame.Gameplay
         public async UniTask ActivateForAI(CharacterBase ai, CancellationToken ct)
         {
             _guardIsReady = true;
-            interactZone.ApplyInteractMaterial();
+            interactZone.AddInteractor();
             TryTransferToAI();
             await UniTask.WaitUntil(() => _stackView.Count == 0, cancellationToken: ct);
             _guardIsReady = false;
-            interactZone.ApplyStandbyMaterial();
+            interactZone.RemoveInteractor();
         }
 
         public async UniTask ReceiveFromAI(CharacterBase ai, CancellationToken ct)
@@ -215,6 +215,7 @@ namespace InGame.Gameplay
 
         private void TryTransferToAI()
         {
+            if (_isEnded) return;
             if (_currentPlayer == null && !_guardIsReady) return;
             if (!_aiIsWaiting || _isTransferringToAI || _stackView.Count <= 0 || _aiQueue.Count == 0) return;
             if (_aiReceivedCount >= _currentAIRequired) return;
@@ -362,6 +363,7 @@ namespace InGame.Gameplay
 
         private void MoveAI()
         {
+            if (_isEnded) return;
             _aiIsWaiting = false;
 
             if (_aiQueue.Count == 0) return;
@@ -373,22 +375,16 @@ namespace InGame.Gameplay
                 _aiQueue[0].controller?.MoveTo(tableWaitPoint.position, OnFrontAiArrived);
 
             var isFirstDeparture = _lastDepartedTransform == null;
+            var previousDepartedTransform = _lastDepartedTransform;
             _lastDepartedTransform = departingAi.character.transform;
 
             var captured = departingAi;
             departingAi.controller?.MoveTo(tableNextPoint.position, () =>
             {
-                if (_prisonArrivalCount >= _prisonGoalCount)
-                {
-                    _isEnded = true;
-                    _spawnWatcherDisposable.Disposable = Disposable.Empty;
-                    if (_aiQueue.Count > 0)
-                        _aiQueue[0].controller?.FollowTransform(captured.character.transform, HandCuffAIQueueStopDistance);
-                    return;
-                }
+                if (_isEnded) return;
                 if (isFirstDeparture) SpawnAI();
                 captured.controller?.MoveTo(GetRandomPrisonPosition(), OnAIReachedPrison);
-            });
+            }, previousDepartedTransform, HandCuffAIQueueStopDistance);
 
             _departureCount++;
             SpawnMoneyItems();
@@ -416,6 +412,9 @@ namespace InGame.Gameplay
         {
             _prisonArrivalCount++;
             if (_prisonArrivalCount < _prisonGoalCount) return;
+
+            _isEnded = true;
+            _spawnWatcherDisposable.Disposable = Disposable.Empty;
 
             if (_unlockZone != null)
             {
