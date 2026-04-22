@@ -42,6 +42,7 @@ namespace InGame.Gameplay
 
         private bool _aiIsWaiting;
         private bool _isTransferringToAI;
+        private bool _isEnded;
         private int _pitchCount;
         private int _aiReceivedCount;
         private int _currentAIRequired;
@@ -250,6 +251,8 @@ namespace InGame.Gameplay
                 HideRequirementLabel();
                 var purchasedClip = _inGameModel.InGameAssetModel.GetAudioClip(nameof(SoundClip.PurchasedMoney));
                 _inGameModel.SoundPlayer.PlayOnce(purchasedClip, destination);
+                if (_aiQueue.Count > 0)
+                    _aiQueue[0].character.SwapModel(1004L);
                 MoveAI();
                 return;
             }
@@ -308,10 +311,16 @@ namespace InGame.Gameplay
 
         #region AI Queue
 
+        private static readonly long[] PrisonerModelIds = { 1002L, 1003L };
+
         private void SpawnAI()
         {
+            if (_isEnded) return;
             _inGameModel.InvokeOnSpawnAI(aiSpawnPoint.position, aiSpawnPoint.rotation, ai =>
             {
+                var modelId = PrisonerModelIds[Random.Range(0, PrisonerModelIds.Length)];
+                ai.SwapModel(modelId);
+
                 var controller = ai.Controller as ControllerAI;
                 _aiQueue.Add((ai, controller));
 
@@ -341,6 +350,7 @@ namespace InGame.Gameplay
 
         private void OnFrontAiArrived()
         {
+            if (_isEnded) return;
             _currentAIRequired = RequirementCycle[_departureCount % RequirementCycle.Length];
             _aiIsWaiting = true;
 
@@ -368,6 +378,14 @@ namespace InGame.Gameplay
             var captured = departingAi;
             departingAi.controller?.MoveTo(tableNextPoint.position, () =>
             {
+                if (_prisonArrivalCount >= _prisonGoalCount)
+                {
+                    _isEnded = true;
+                    _spawnWatcherDisposable.Disposable = Disposable.Empty;
+                    if (_aiQueue.Count > 0)
+                        _aiQueue[0].controller?.FollowTransform(captured.character.transform, HandCuffAIQueueStopDistance);
+                    return;
+                }
                 if (isFirstDeparture) SpawnAI();
                 captured.controller?.MoveTo(GetRandomPrisonPosition(), OnAIReachedPrison);
             });

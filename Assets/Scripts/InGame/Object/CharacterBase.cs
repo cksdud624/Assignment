@@ -102,6 +102,30 @@ namespace InGame.Object
         public Collider Collider => Hub.Collider;
         public void SetCharacterState(CharacterState state) => Hub.CharacterState.Value = state;
 
+        public void SwapModel(long statusId)
+        {
+            var assetModel = InGameModel.InGameAssetModel;
+            var modelPrefab = assetModel.GetModel(statusId.ToString());
+            if (modelPrefab == null)
+            {
+                Debug.LogWarning($"SwapModel: model {statusId} not found");
+                return;
+            }
+
+            if (Hub.Model != null) Destroy(Hub.Model);
+
+            var newModel = Instantiate(modelPrefab, Hub.FacingNode);
+            newModel.transform.localPosition = Vector3.zero;
+            newModel.transform.localRotation = Quaternion.identity;
+            Hub.Model = newModel;
+            Hub.Collider = newModel.GetComponent<Collider>();
+            InGameModel.InGameObjectModel.IgnoreCollisionsWithCharacters(Hub.Collider);
+            Hub.AnimationPlayer.RebindToModel(newModel);
+
+            var record = Global.Instance.TableManager.CharacterStatusRecord.GetRecord(statusId);
+            if (record != null) Hub.Info.Status = record;
+        }
+
         private new CharacterHub Hub
         {
             get => (CharacterHub)base.Hub;

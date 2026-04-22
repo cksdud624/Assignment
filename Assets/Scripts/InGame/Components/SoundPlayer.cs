@@ -23,6 +23,8 @@ namespace InGame.Components
                 var src = go.AddComponent<AudioSource>();
                 src.playOnAwake = false;
                 src.spatialBlend = 1f;
+                src.pitch = 1f;
+                src.volume = 1f;
                 _pool.Add(src);
             }
         }
@@ -54,6 +56,8 @@ namespace InGame.Components
             // all busy — evict oldest (round-robin)
             var evict = _pool[_poolIndex];
             evict.Stop();
+            evict.pitch = 1f;
+            evict.volume = 1f;
             _poolIndex = (_poolIndex + 1) % _pool.Count;
             return evict;
         }

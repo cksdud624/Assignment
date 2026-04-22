@@ -49,6 +49,27 @@ namespace Common
                 target.localScale = Vector3.zero;
         }
 
+        public static async UniTask AppearScaleAsync(
+            Transform target,
+            CancellationToken cancellationToken,
+            float duration = 0.5f)
+        {
+            if (target == null) return;
+            target.localScale = Vector3.zero;
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                if (target == null) return;
+                elapsed += Time.deltaTime;
+                var t = Mathf.Clamp01(elapsed / duration);
+                var ease = 1f - Mathf.Pow(1f - t, 3f);
+                target.localScale = Vector3.one * ease;
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            }
+            if (target != null)
+                target.localScale = Vector3.one;
+        }
+
         public static async UniTask PopScaleAsync(
             Transform target,
             CancellationToken cancellationToken,

@@ -1,4 +1,7 @@
-Id	MoveSpeed
-long	float
-1001	5
-1002	1
+Id	Name	MoveSpeed
+long	string	float
+1001	player	5
+1002	human	3
+1003	human2	3
+1004	human3	3
+1005	miner	1

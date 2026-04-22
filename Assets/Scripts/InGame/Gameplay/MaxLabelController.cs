@@ -16,6 +16,7 @@ namespace InGame.Gameplay
         private RectTransform _canvasRect;
         private Camera _camera;
         private bool _isFloatingActive;
+        public bool IsFloatingActive => _isFloatingActive;
 
         private void Awake()
         {

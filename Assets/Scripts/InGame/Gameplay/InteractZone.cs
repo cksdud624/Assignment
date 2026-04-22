@@ -81,6 +81,13 @@ namespace InGame.Gameplay
         public void ApplyInteractMaterial() => ApplyMaterial(interactMaterial);
         public void ApplyStandbyMaterial() => ApplyMaterial(standbyMaterial);
 
+        public bool IsInteractMaterial()
+        {
+            if(meshRenderer != null)
+                return meshRenderer.material == interactMaterial;
+            return false;
+        }
+
         private void ApplyMaterial(Material material)
         {
             if (meshRenderer != null && material != null)

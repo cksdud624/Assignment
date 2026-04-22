@@ -32,7 +32,7 @@ namespace InGame
             transform.SetParent(target);
         }
 
-        public async UniTask RevealAsync(Transform target, CancellationToken ct)
+        public async UniTask RevealAsync(Transform target, CancellationToken ct, bool restoreInput = true)
         {
             var originalParent = transform.parent;
             if (originalParent == null) return;
@@ -58,8 +58,12 @@ namespace InGame
             transform.SetParent(originalParent);
             transform.localPosition = originalLocalPos;
             transform.localRotation = originalLocalRot;
-            _inGameModel.InvokeOnSetStandbyEnabled(true);
-            _inGameModel.InvokeOnSetPlayerInputEnabled(true);
+
+            if (restoreInput)
+            {
+                _inGameModel.InvokeOnSetStandbyEnabled(true);
+                _inGameModel.InvokeOnSetPlayerInputEnabled(true);
+            }
         }
 
         private async UniTask MoveToAsync(Vector3 to, Quaternion toRot, float duration, CancellationToken ct)

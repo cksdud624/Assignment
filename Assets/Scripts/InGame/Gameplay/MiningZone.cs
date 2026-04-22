@@ -7,6 +7,7 @@ using UniRx;
 using UniRx.Triggers;
 using UnityEngine;
 using static Common.GameDefine;
+using Unit = UniRx.Unit;
 
 namespace InGame.Gameplay
 {
@@ -24,6 +25,9 @@ namespace InGame.Gameplay
         private float _scaledY;
         private InGameModel _inGameModel;
         private SerialDisposable _oreRespawnDisposable;
+
+        private readonly Subject<Unit> _onOreAvailable = new();
+        public IObservable<Unit> OnOreAvailable => _onOreAvailable;
 
         public void Init(InGameModel inGameModel)
         {
@@ -69,6 +73,10 @@ namespace InGame.Gameplay
                     obj.transform.localScale = new Vector3(objectScale, _scaledY, objectScale);
                     _spawnedObjects.Add(obj);
                     obj.Init(_inGameModel, ObjectType.Mining);
+                    obj.State
+                        .Where(s => s == ObjectState.Playing)
+                        .Subscribe(_ => _onOreAvailable.OnNext(Unit.Default))
+                        .AddTo(this);
                 }
             }
         }
@@ -92,6 +100,7 @@ namespace InGame.Gameplay
 
         private void OnTriggerEntered(Collider col)
         {
+            if (col.isTrigger) return;
             var characterBase = col.GetComponentInParent<CharacterBase>();
             if (characterBase == null) return;
             characterBase.SetCharacterState(CharacterState.Mining);
@@ -99,8 +108,9 @@ namespace InGame.Gameplay
 
         private void OnTriggerExited(Collider col)
         {
+            if (col.isTrigger) return;
             var characterBase = col.GetComponentInParent<CharacterBase>();
-            if (characterBase == null) return;
+            if (characterBase == null || !characterBase.IsPlayer) return;
             characterBase.SetCharacterState(CharacterState.Idle);
                 
         }
@@ -108,6 +118,7 @@ namespace InGame.Gameplay
         private void OnDestroy()
         {
             _oreRespawnDisposable?.Dispose();
+            _onOreAvailable.Dispose();
         }
 
         #endregion

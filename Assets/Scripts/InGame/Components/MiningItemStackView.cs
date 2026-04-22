@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using Common;
 using Common.Template.Interface;
 using Cysharp.Threading.Tasks;
@@ -26,7 +24,6 @@ namespace InGame.Components
         private bool _wasMoving;
 
         private MaxLabelController _maxLabelController;
-        private CancellationTokenSource _maxLoopCts;
 
         public void Init(CharacterHub hub, InGameModel inGameModel)
         {
@@ -53,36 +50,16 @@ namespace InGame.Components
                 _maxLabelController = inGameModel.MaxLabelController;
 
                 hub.Info.MiningItemCount
-                    .Select(count => hub.Info.MaxMiningItemCount.Value > 0 && count >= hub.Info.MaxMiningItemCount.Value)
-                    .DistinctUntilChanged()
-                    .Subscribe(isAtMax =>
+                    .Where(count => hub.Info.MaxMiningItemCount.Value > 0 && count >= hub.Info.MaxMiningItemCount.Value)
+                    .Subscribe(_ =>
                     {
-                        _maxLoopCts?.Cancel();
-                        _maxLoopCts?.Dispose();
-                        _maxLoopCts = null;
-
-                        if (isAtMax)
-                        {
-                            _maxLoopCts = new CancellationTokenSource();
-                            RunMaxLabelLoop(_maxLoopCts.Token).Forget();
-                        }
+                        if (!_maxLabelController.IsFloatingActive)
+                            _maxLabelController.ShowFloatingMax(_maxLabelAnchor, MiningHeightOffset);
                     })
                     .AddTo(this);
             }
 
             Global.Instance.BindUpdate(this);
-        }
-
-        private async UniTaskVoid RunMaxLabelLoop(CancellationToken ct)
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                var max = _hub.Info.MaxMiningItemCount.Value;
-                _maxLabelController.ShowFloatingMax(_maxLabelAnchor, MiningHeightOffset);
-                await UniTask.Delay(
-                    TimeSpan.FromSeconds(_maxLabelController.FloatingRiseDuration),
-                    cancellationToken: ct).SuppressCancellationThrow();
-            }
         }
 
         public void OnUpdate()
@@ -156,8 +133,6 @@ namespace InGame.Components
 
         private void OnDestroy()
         {
-            _maxLoopCts?.Cancel();
-            _maxLoopCts?.Dispose();
             Global.Instance?.UnBindUpdate(this);
             foreach (var item in _stackedItems)
                 if (item != null) Destroy(item);

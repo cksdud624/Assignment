@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using Common;
+using Cysharp.Threading.Tasks;
 using InGame.Components;
 using InGame.Gameplay;
 using InGame.Model;
@@ -28,6 +30,9 @@ namespace InGame
         [SerializeField] private SoundPlayer soundPlayer;
 
         [SerializeField] private GameClearView gameClear;
+        [SerializeField] private GameObject loadingUI;
+        [SerializeField] private GameObject prison;
+        [SerializeField] private GameObject newPrison;
 
         private InGameModel _inGameModel;
 
@@ -58,6 +63,7 @@ namespace InGame
 
         private void OnInitialized()
         {
+            loadingUI?.SetActive(false);
             _inGameModel.SoundPlayer = soundPlayer;
             _inGameModel.InvokeOnSpawnPlayer(Vector3.zero);
             var player = _inGameModel.InGameObjectModel.Player;
@@ -102,6 +108,7 @@ namespace InGame
                 var spawnPos = spawnPoint != null ? spawnPoint.position : Vector3.zero;
                 _inGameModel.InvokeOnSpawnAI(spawnPos, Quaternion.identity, ai =>
                 {
+                    ai.SwapModel(1005L);
                     _inGameModel.InGameObjectModel.ActivateAll();
                     ai.gameObject.AddComponent<MinerAIBrain>().Init(ai, miningZone, handCuffMachineZone);
                 });
@@ -136,7 +143,25 @@ namespace InGame
             prisonUnlockZone?.Stop();
             foreach (var entry in moneySpendZones)
                 entry.zone.Stop();
-            
+
+            GameClearSequenceAsync(this.GetCancellationTokenOnDestroy()).Forget();
+        }
+
+        private async UniTaskVoid GameClearSequenceAsync(System.Threading.CancellationToken ct)
+        {
+            if (prison != null)
+                await TweenUtility.ShrinkScaleAsync(prison.transform, ct);
+
+            if (newPrison != null)
+            {
+                newPrison.SetActive(true);
+                var colliders = newPrison.GetComponentsInChildren<Collider>();
+                foreach (var col in colliders) col.enabled = false;
+                await TweenUtility.AppearScaleAsync(newPrison.transform, ct);
+                foreach (var col in colliders) col.enabled = true;
+                await cameraController.RevealAsync(newPrison.transform, ct, restoreInput: false);
+            }
+
             gameClear.gameObject.SetActive(true);
         }
 

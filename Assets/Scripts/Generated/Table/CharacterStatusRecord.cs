@@ -43,13 +43,15 @@ namespace Generated.Table
 	public class CharacterStatusData
 	{
 		public long Id {get; private set;}
+		public string Name {get; private set;}
 		public float MoveSpeed {get; private set;}
 
 		public CharacterStatusData(BinaryReader reader)
 		{
 			string[] tableDatas = reader.ReadString().Split('	');
 			Id = long.TryParse(tableDatas[0], out long vLong0) ? vLong0 : 0L;
-			MoveSpeed = float.TryParse(tableDatas[1], out float vFloat1) ? vFloat1 : 0f;
+			Name = tableDatas[1];
+			MoveSpeed = float.TryParse(tableDatas[2], out float vFloat2) ? vFloat2 : 0f;
 		}
 	}
 }

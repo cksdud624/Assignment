@@ -15,6 +15,7 @@ namespace InGame.Components
     {
         private Animator _animator;
         private readonly Dictionary<int, AnimationClipPlayable> _animationClips = new();
+        private readonly Dictionary<int, AnimationClip> _sourceClips = new();
 
         private PlayableGraph _graph;
         private AnimationLayerMixerPlayable _layerMixer;
@@ -44,7 +45,11 @@ namespace InGame.Components
             _animator.applyRootMotion = false;
 
             foreach (var clip in clips)
-                _animationClips.Add(Convert.ToInt32(clip.Key), AnimationClipPlayable.Create(_graph, clip.Value));
+            {
+                var key = Convert.ToInt32(clip.Key);
+                _sourceClips[key] = clip.Value;
+                _animationClips.Add(key, AnimationClipPlayable.Create(_graph, clip.Value));
+            }
 
             var output = AnimationPlayableOutput.Create(_graph, "AnimationPlayer", _animator);
             _layerMixer = AnimationLayerMixerPlayable.Create(_graph, 2);
@@ -113,6 +118,36 @@ namespace InGame.Components
             _layerMixer.SetInputWeight(1, 1f);
             var playable = AnimationClipPlayable.Create(_graph, clip);
             CrossFadeUpperBody(playable, crossFadeDuration, desiredDuration: desiredDuration).Forget();
+        }
+
+        public void RebindToModel(GameObject model)
+        {
+            _fadeCts?.Cancel(); _fadeCts?.Dispose(); _fadeCts = null;
+            _upperFadeCts?.Cancel(); _upperFadeCts?.Dispose(); _upperFadeCts = null;
+            _layerFadeCts?.Cancel(); _layerFadeCts?.Dispose(); _layerFadeCts = null;
+
+            if (_graph.IsValid()) _graph.Destroy();
+            _animationClips.Clear();
+            _currentClip = default; _targetClip = default; _currentSlot = 0;
+            _upperCurrentClip = default; _upperTargetClip = default; _upperCurrentSlot = 0;
+
+            _graph = PlayableGraph.Create("AnimationGraph");
+            var modelAnimator = model.GetComponent<Animator>();
+            _animator = modelAnimator == null ? model.AddComponent<Animator>() : modelAnimator;
+            _animator.applyRootMotion = false;
+
+            foreach (var kvp in _sourceClips)
+                _animationClips[kvp.Key] = AnimationClipPlayable.Create(_graph, kvp.Value);
+
+            var output = AnimationPlayableOutput.Create(_graph, "AnimationPlayer", _animator);
+            _layerMixer = AnimationLayerMixerPlayable.Create(_graph, 2);
+            _fullBodyMixer = AnimationMixerPlayable.Create(_graph, 2);
+            _layerMixer.ConnectInput(0, _fullBodyMixer, 0, 1f);
+            _upperBodyMixer = AnimationMixerPlayable.Create(_graph, 2);
+            _layerMixer.ConnectInput(1, _upperBodyMixer, 0, 0f);
+            _layerMixer.SetLayerMaskFromAvatarMask(1, CreateUpperBodyMask());
+            output.SetSourcePlayable(_layerMixer);
+            _graph.Play();
         }
 
         public void StopUpperBodyAnimation(float duration = 0.3f)

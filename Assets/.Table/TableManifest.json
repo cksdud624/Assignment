@@ -2,11 +2,11 @@
     "tables": [
         {
             "fileName": "CharacterStatus",
-            "hash": "ec7305658d9facb24fe343a48aa75c39"
+            "hash": "5b1a4be61186b09a3379aae64afacc91"
         },
         {
             "fileName": "MiningEquipments",
-            "hash": "86b4b6054bed385cb06a855ba8f0d900"
+            "hash": "211e79ae1774d7ec38d9c733a9101a1d"
         }
     ]
 }

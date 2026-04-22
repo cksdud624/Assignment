@@ -24,8 +24,10 @@ namespace InGame.Components
         private readonly SerialDisposable _cooldownDisposable = new();
         private readonly Subject<Unit> _onMiningCompleted = new();
         private readonly Subject<Unit> _onMiningStarted = new();
+        private readonly Subject<Unit> _onOreAcquiredForAI = new();
         public IObservable<Unit> OnMiningCompleted => _onMiningCompleted;
         public IObservable<Unit> OnMiningStarted => _onMiningStarted;
+        public IObservable<Unit> OnOreAcquiredForAI => _onOreAcquiredForAI;
         private bool _isMining;
         private bool _onCooldown;
         private float _cycleEndTime;
@@ -66,6 +68,8 @@ namespace InGame.Components
             _loopSource.spatialBlend = 1f;
             _loopSource.loop = true;
             _loopSource.playOnAwake = false;
+            _loopSource.pitch = 1f;
+            _loopSource.volume = 1f;
 
             hub.CharacterState
                 .CombineLatest(hub.Info.MiningLevel, (state, level) => state == CharacterState.Mining && level >= 2)
@@ -169,6 +173,8 @@ namespace InGame.Components
                     {
                         if (_hub.Info.MiningItemCount.Value < _hub.Info.MaxMiningItemCount.Value)
                             _hub.Info.MiningItemCount.Value++;
+                        else
+                            _hub.Info.MiningItemCount.SetValueAndForceNotify(_hub.Info.MiningItemCount.Value);
                         obj.Disappear();
                         PlayMiningOre(obj.transform.position);
                     }
@@ -192,6 +198,8 @@ namespace InGame.Components
                     {
                         if (_hub.Info.MiningItemCount.Value < _hub.Info.MaxMiningItemCount.Value)
                             _hub.Info.MiningItemCount.Value++;
+                        else
+                            _hub.Info.MiningItemCount.SetValueAndForceNotify(_hub.Info.MiningItemCount.Value);
                         obj.Disappear();
                         PlayMiningOre(obj.transform.position);
                     }
@@ -272,6 +280,12 @@ namespace InGame.Components
                         else if (_hub.Info.MiningItemCount.Value < _hub.Info.MaxMiningItemCount.Value)
                             _hub.Info.MiningItemCount.Value++;
                         closest.Disappear();
+
+                        _miningLoop.Disposable = Disposable.Empty;
+                        _isMining = false;
+                        _hub.AnimationPlayer.StopUpperBodyAnimation(FadeDuration);
+                        _onOreAcquiredForAI.OnNext(Unit.Default);
+                        return;
                     }
                 }
                 else
@@ -280,6 +294,8 @@ namespace InGame.Components
                         OnItemMinedDirect.Invoke(closest.transform.position);
                     else if (_hub.Info.MiningItemCount.Value < _hub.Info.MaxMiningItemCount.Value)
                         _hub.Info.MiningItemCount.Value++;
+                    else
+                        _hub.Info.MiningItemCount.SetValueAndForceNotify(_hub.Info.MiningItemCount.Value);
                     closest.Disappear();
                 }
             }
@@ -363,6 +379,7 @@ namespace InGame.Components
             _cooldownDisposable.Dispose();
             _onMiningCompleted.Dispose();
             _onMiningStarted.Dispose();
+            _onOreAcquiredForAI.Dispose();
         }
     }
 }

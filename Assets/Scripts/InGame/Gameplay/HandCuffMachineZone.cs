@@ -91,7 +91,7 @@ namespace InGame.Gameplay
         private void StartConsumeLoop()
         {
             _consumeDisposable.Disposable = Observable
-                .Interval(TimeSpan.FromSeconds(0.7))
+                .Interval(TimeSpan.FromSeconds(0.6))
                 .TakeWhile(_ => MiningItemCount.Value > 0)
                 .Subscribe(OnConsumeItem);
         }
